@@ -1,8 +1,16 @@
+from datetime import datetime
 import yfinance  as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import xlsxwriter
+import requests_cache
+from requests import Session
+from requests_cache import CacheMixin, SQLiteCache
+from requests_ratelimiter import LimiterMixin, MemoryQueueBucket
+from pyrate_limiter import Duration, RequestRate, Limiter
+class CachedLimiterSession(CacheMixin, LimiterMixin, Session):
+    pass
+
 pd.set_option('display.width', None)
 
 
@@ -14,13 +22,24 @@ class Data:
         self.data = self.get()
 
     def get(self):
-        data = yf.download(tickers=self.ticker, start=self.start_date, end=self.end_date, multi_level_index=False)
-        data.columns = ['close', 'high', 'low', 'open', 'volume']
+        session = CachedLimiterSession(
+            limiter=Limiter(RequestRate(5, Duration.SECOND*5)),
+            bucket_class=MemoryQueueBucket,
+            backend=SQLiteCache('yfinance.cache'))
+        session.headers['User-agent'] = 'my_program/1.0'
+        ticker = yf.Ticker(self.ticker, session=session)
+        # Get the data
+        data = ticker.history(start=self.start_date, end=self.end_date)
+        # Slice only the first four columns
+        data = data.iloc[:, :4]
+        # Rename columns for ease
+        data.columns = ['open', 'high', 'low', 'close']
+
         return data
 
     def process_data(self):
         data = self.data.copy()
-        data.drop(['volume'],axis=1,  inplace=True)
+
         return data
 
     def visualize(self):
@@ -36,7 +55,7 @@ class Data:
 
 class TechnicalIndicators(Data):
     def sma(self, sma_short:int, sma_long:int):
-        df = self.process_data()
+        df = self.data.copy()
         df[f'sma_{sma_short}'] = df['close'].rolling(window=sma_short).mean()
         df[f'sma_{sma_long}'] = df['close'].rolling(window=sma_long).mean()
         df['delta'] = df[f'sma_{sma_short}'] - df[f'sma_{sma_long}']
@@ -44,7 +63,7 @@ class TechnicalIndicators(Data):
         return df
 
     def donchian_channel(self, period):
-        df = self.process_data().copy()
+        df = self.data.copy()
         df['upper_band'] = df['close'].rolling(window=period).max()
         df['upper_band_prev'] = df['upper_band'].shift(1)
         df['lower_band'] = df['close'].rolling(window=period).min()
@@ -84,8 +103,8 @@ class Returns(TechnicalIndicators):
     def calculate(self):
         data = self.position
         data['returns'] = data['close'].div(data['close'].shift(1))
-        data['strategy_returns'] = data['returns'] * data['position'].shift(1)
         data['log_returns'] = np.log(data['returns'])
+        data['strategy_returns'] = data['returns'] * data['position'].shift(1)
         data['strategy_log_returns'] = data['log_returns'] * data['position'].shift(1)
         data['cum_returns'] = data['log_returns'].cumsum().apply(np.exp)
         data['strategy_cum_returns'] = data['strategy_log_returns'].cumsum().apply(np.exp)
@@ -94,7 +113,7 @@ class Returns(TechnicalIndicators):
         return data
 
     @staticmethod
-    def strategy_stats(log_returns:pd.Series, risk_free_rate:float=0.02):
+    def strategy_stats(log_returns:pd.Series, risk_free_rate:float=0.03284):
 
         stats = {}
         stats['total_returns'] = (np.exp(log_returns.sum()) -  1) * 100
@@ -163,18 +182,15 @@ class Returns(TechnicalIndicators):
             worksheet.insert_chart('U2', chart)
 
 
-
-
-
-
-
 if __name__ =='__main__':
-    data = Returns('aapl', start_date='2020-01-01',
-                   end_date='2020-12-31',strategy='Donchian Channel', donchian_period=20)
+    data = Returns("GOOG", start_date='2018-01-01',
+                   end_date='2024-12-31',strategy='SMA crossover', sma_short=20, sma_long=50)
     stats = pd.DataFrame(Returns.strategy_stats(data.calculate()['log_returns']), index=['Buy and hold returns'])
     stats = pd.concat([stats, pd.DataFrame(Returns.strategy_stats(data.calculate()['strategy_log_returns']),
                                            index=['Strategy returns'])])
-    print(data.export(stats))
+    print(data)
+    print(data.calculate())
+    print(stats)
 
 
 
