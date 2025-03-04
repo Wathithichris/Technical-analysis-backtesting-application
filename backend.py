@@ -8,10 +8,11 @@ from requests import Session
 from requests_cache import CacheMixin, SQLiteCache
 from requests_ratelimiter import LimiterMixin, MemoryQueueBucket
 from pyrate_limiter import Duration, RequestRate, Limiter
+pd.set_option('display.width', None)
+
+
 class CachedLimiterSession(CacheMixin, LimiterMixin, Session):
     pass
-
-pd.set_option('display.width', None)
 
 
 class Data:
@@ -23,7 +24,7 @@ class Data:
 
     def get(self):
         session = CachedLimiterSession(
-            limiter=Limiter(RequestRate(5, Duration.SECOND*5)),
+            limiter=Limiter(RequestRate(10000, Duration.DAY*1)),
             bucket_class=MemoryQueueBucket,
             backend=SQLiteCache('yfinance.cache'))
         session.headers['User-agent'] = 'my_program/1.0'
@@ -35,6 +36,14 @@ class Data:
         # Rename columns for ease
         data.columns = ['open', 'high', 'low', 'close']
 
+        # Reset the index
+        data.reset_index(inplace=True)
+
+        # Format datetime
+        data['Date'] = pd.to_datetime(data['Date']).dt.date
+
+        # Set date as the new index
+        data.set_index(['Date'], inplace=True)
         return data
 
     def process_data(self):
@@ -50,7 +59,7 @@ class Data:
         ax.set_ylabel('Price')
         ax.tick_params('x', rotation=45)
         ax.set_title(f"Daily {self.ticker.title()} closing prices")
-        return plt.show()
+        return fig
 
 
 class TechnicalIndicators(Data):
@@ -73,12 +82,12 @@ class TechnicalIndicators(Data):
 
 
 class Returns(TechnicalIndicators):
-    def __init__(self, ticker, start_date, end_date, strategy, sma_short=None, sma_long=None, donchian_period=None):
+    def __init__(self, ticker, start_date, end_date, strategy, **kwargs):
         super().__init__(ticker=ticker, start_date=start_date, end_date=end_date)
         self.strategy = strategy
-        self.sma_short = sma_short
-        self.sma_long = sma_long
-        self.donchian_period = donchian_period
+        self.sma_short = kwargs.get('sma_short')
+        self.sma_long = kwargs.get('sma_long')
+        self.donchian_period = kwargs.get('donchian_period')
         self.position = self.get_position()
         self.returns_data = self.calculate()
         #self.stats = self.strategy_stats()
@@ -116,22 +125,22 @@ class Returns(TechnicalIndicators):
     def strategy_stats(log_returns:pd.Series, risk_free_rate:float=0.03284):
 
         stats = {}
-        stats['total_returns'] = (np.exp(log_returns.sum()) -  1) * 100
-        stats['annual_returns'] = (np.exp(log_returns.mean() * 252) - 1) * 100
-        stats['annual_volatility'] = log_returns.std() * np.sqrt(252) * 100
+        stats['total_returns%'] = (np.exp(log_returns.sum()) -  1) * 100
+        stats['annual_returns%'] = (np.exp(log_returns.mean() * 252) - 1) * 100
+        stats['annual_volatility%'] = log_returns.std() * np.sqrt(252) * 100
         annualized_downside =  (log_returns.loc[log_returns<0].std() * np.sqrt(252)) * 100
-        stats['sortino_ratio'] = (stats['annual_returns'] - risk_free_rate*100) / annualized_downside
-        stats['sharpe_ratio'] = (stats['annual_returns'] - risk_free_rate*100) / stats['annual_volatility']
+        stats['sortino_ratio'] = (stats['annual_returns%'] - risk_free_rate*100) / annualized_downside
+        stats['sharpe_ratio'] = (stats['annual_returns%'] - risk_free_rate*100) / stats['annual_volatility%']
         cumulative_returns = log_returns.cumsum()
         peak = log_returns.cummax()
         draw_down = peak - cumulative_returns
         max_idx = draw_down.argmax()
-        stats['max_dd'] = 1 - np.exp(cumulative_returns.iloc[max_idx]) / np.exp(peak.iloc[max_idx])
+        stats['max_dd%'] = 1 - (np.exp(cumulative_returns.iloc[max_idx]) / np.exp(peak.iloc[max_idx]))
         strat_dd = draw_down[draw_down==0]
         strat_dd_diff = strat_dd.index[1:] - strat_dd.index[:-1]
         strat_dd_days = strat_dd_diff.map(lambda x: x.days).values
         strat_dd_days = np.hstack([strat_dd_days, (draw_down.index[-1] - strat_dd.index[-1]).days])
-        stats['max_dd_duration'] = strat_dd_days.max()
+        stats['max_dd_duration'] =f"{strat_dd_days.max()} days"
 
         stats = {k: np.round(v, 4) if type(v) == float else v for k, v in stats.items()}
         return stats
@@ -184,13 +193,14 @@ class Returns(TechnicalIndicators):
 
 if __name__ =='__main__':
     data = Returns("GOOG", start_date='2018-01-01',
-                   end_date='2024-12-31',strategy='SMA crossover', sma_short=20, sma_long=50)
+                   end_date='2024-12-31',strategy='Donchian Channel', donchian_period=20)
     stats = pd.DataFrame(Returns.strategy_stats(data.calculate()['log_returns']), index=['Buy and hold returns'])
     stats = pd.concat([stats, pd.DataFrame(Returns.strategy_stats(data.calculate()['strategy_log_returns']),
                                            index=['Strategy returns'])])
-    print(data)
+    print(data.data)
     print(data.calculate())
     print(stats)
+    print(data.export(stats))
 
 
 
