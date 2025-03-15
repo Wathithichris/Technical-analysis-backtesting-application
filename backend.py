@@ -9,6 +9,7 @@ from requests_cache import CacheMixin, SQLiteCache
 from requests_ratelimiter import LimiterMixin, MemoryQueueBucket
 from pyrate_limiter import Duration, RequestRate, Limiter
 pd.set_option('display.width', None)
+from treasury_yield import get_rf
 
 
 class CachedLimiterSession(CacheMixin, LimiterMixin, Session):
@@ -202,9 +203,24 @@ class Returns(TechnicalIndicators):
 
 
 if __name__ =='__main__':
-    data = Returns("aapl", start_date='2018-01-01',
-                   end_date='2024-12-31',strategy='EMA crossover', ema_short=20, ema_long=50)
-    stats = pd.DataFrame(Returns.strategy_stats(data.calculate()['log_returns']), index=['Buy and hold returns'])
+    # Date parameters
+    start_date = "2018-01-01"
+    end_date = '2024-12-31'
+
+    # Get returns data
+    data = Returns("aapl", start_date=start_date,
+                   end_date=end_date,strategy='EMA crossover', ema_short=20, ema_long=50)
+
+    st = data.data.iloc[0].name
+    ed = data.data.iloc[-1].name
+    print(st, ed)
+
+    # Get the risk free rate for the period
+    rf = get_rf(start_date=start_date, end_date=end_date)
+
+    # Get strategy statistics
+    stats = pd.DataFrame(Returns.strategy_stats(data.calculate()['log_returns'], risk_free_rate=rf),
+                         index=['Buy and hold returns'])
     stats = pd.concat([stats, pd.DataFrame(Returns.strategy_stats(data.calculate()['strategy_log_returns']),
                                            index=['Strategy returns'])])
     print(data.data)

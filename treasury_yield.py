@@ -1,6 +1,6 @@
 import pandas as pd
 
-def get_rf(start_date:str, end_date:str):
+def get_rf(start_date, end_date):
     df_yields = pd.read_csv('US10Y_yields.csv', parse_dates=['observation_date'])
     df_yields = df_yields[df_yields['DGS10']>=0]
     df_yields = df_yields.loc[df_yields['observation_date'].between(start_date, end_date, inclusive='both')]

@@ -80,15 +80,21 @@ if backtest:
                          donchian_period=period)
 
         stats = None
-        if data:
-            stats = pd.DataFrame(Returns.strategy_stats(data.calculate()['log_returns']), index=['Buy_and_hold'])
-            stats = pd.concat([stats, pd.DataFrame(Returns.strategy_stats(data.calculate()['strategy_log_returns']),
-                                                   index=['Strategy_returns'])])
 
-    except Exception as e:
-        match e:
-            case ValueError():
-                st.write("Oops!, please enter a valid ticker")
+        if data:
+            # Extract the start and end dates from the data
+            start = pd.to_datetime(data.data.iloc[0].name)
+            end = pd.to_datetime(data.data.iloc[-1].name)
+
+            # Get the risk-free rate for the period
+            rf = get_rf(start_date=start, end_date=end)
+
+            stats = pd.DataFrame(Returns.strategy_stats(data.calculate()['log_returns']),
+                                 index=['Buy_and_hold'])
+            stats = pd.concat([stats, pd.DataFrame(Returns.strategy_stats(data.calculate()['strategy_log_returns'])
+                                                                          , index=['Strategy_returns'])])
+    except ValueError:
+        st.write("Oops!, please enter a valid ticker")
 
     else:
         # Create figure object
