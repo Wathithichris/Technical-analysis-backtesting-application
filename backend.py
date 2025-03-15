@@ -46,11 +46,6 @@ class Data:
         data.set_index(['Date'], inplace=True)
         return data
 
-    def process_data(self):
-        data = self.data.copy()
-
-        return data
-
     def visualize(self):
         df_plot = self.data.copy()
         fig, ax = plt.subplots()
@@ -80,6 +75,14 @@ class TechnicalIndicators(Data):
         df['mid_band'] = (df['upper_band']+df['lower_band'])/2
         return df
 
+    def ema(self, ema_short:int, ema_long:int):
+        df = self.data.copy()
+        df[f"ema_{ema_short}"] = df['close'].ewm(span=ema_short, adjust=False, min_periods=ema_short).mean()
+        df[f"ema_{ema_long}"] = df['close'].ewm(span=ema_long, adjust=False, min_periods=ema_long).mean()
+        df['delta'] = df[f"ema_{ema_short}"] - df[f"ema_{ema_long}"]
+        df['delta_prev'] = df['delta'].shift(1)
+        return df
+
 
 class Returns(TechnicalIndicators):
     def __init__(self, ticker, start_date, end_date, strategy, **kwargs):
@@ -87,14 +90,21 @@ class Returns(TechnicalIndicators):
         self.strategy = strategy
         self.sma_short = kwargs.get('sma_short')
         self.sma_long = kwargs.get('sma_long')
+        self.ema_short = kwargs.get('ema_short')
+        self.ema_long = kwargs.get('ema_long')
         self.donchian_period = kwargs.get('donchian_period')
         self.position = self.get_position()
         self.returns_data = self.calculate()
         #self.stats = self.strategy_stats()
 
     def get_position(self):
-        if self.strategy=='SMA crossover':
-            df = self.sma(self.sma_short, self.sma_long)
+        moving_averages = ['SMA crossover', 'EMA crossover']
+        if self.strategy in moving_averages:
+            if self.strategy=='SMA crossover':
+                df = self.sma(self.sma_short, self.sma_long)
+            elif self.strategy=='EMA crossover':
+                df = self.ema(self.ema_short, self.ema_long)
+
             df['position'] = np.nan
             df['position'] = np.where((df['delta']>0) & (df['delta_prev']<0), 1,
                                       np.where((df['delta']<0) & (df['delta_prev']>0), 0, df['position']))
@@ -135,7 +145,7 @@ class Returns(TechnicalIndicators):
         peak = log_returns.cummax()
         draw_down = peak - cumulative_returns
         max_idx = draw_down.argmax()
-        stats['max_dd%'] = 1 - (np.exp(cumulative_returns.iloc[max_idx]) / np.exp(peak.iloc[max_idx]))
+        stats['max_dd%'] = (1 - (np.exp(cumulative_returns.iloc[max_idx]) / np.exp(peak.iloc[max_idx])))*100
         strat_dd = draw_down[draw_down==0]
         strat_dd_diff = strat_dd.index[1:] - strat_dd.index[:-1]
         strat_dd_days = strat_dd_diff.map(lambda x: x.days).values
@@ -175,13 +185,13 @@ class Returns(TechnicalIndicators):
 
             chart = workbook.add_chart({'type': 'line'})
             chart.add_series({
-                'values': f'={sheet_name}!$P$7:$P${max_rows}',
+                'values': f'={sheet_name}!$O$7:$O${max_rows}',
                 'categories':f'={sheet_name}!$A$7:$A${max_rows}',
                 'gap':2,
                 'name': 'Buy and hold'
             })
             chart.add_series({
-                'values': f'={sheet_name}!$Q$7:$Q${max_rows}',
+                'values': f'={sheet_name}!$P$7:$P${max_rows}',
                 'gap':2,
                 'name': 'Strategy return'
             })
@@ -192,8 +202,8 @@ class Returns(TechnicalIndicators):
 
 
 if __name__ =='__main__':
-    data = Returns("GOOG", start_date='2018-01-01',
-                   end_date='2024-12-31',strategy='Donchian Channel', donchian_period=20)
+    data = Returns("aapl", start_date='2018-01-01',
+                   end_date='2024-12-31',strategy='EMA crossover', ema_short=20, ema_long=50)
     stats = pd.DataFrame(Returns.strategy_stats(data.calculate()['log_returns']), index=['Buy and hold returns'])
     stats = pd.concat([stats, pd.DataFrame(Returns.strategy_stats(data.calculate()['strategy_log_returns']),
                                            index=['Strategy returns'])])
