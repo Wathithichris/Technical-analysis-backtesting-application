@@ -104,15 +104,25 @@ if backtest:
         st.plotly_chart(figure_or_data=figure, height=1500, width=600)
 
         # Output stats dataframe
-        st.dataframe(data=stats)
+        st.dataframe(stats)
 
         # Get extensive backtest
-        results = data.export(stats)
+        returns_data = data.calculate()
+        results = data.export(stats, returns_data)
 
-        # Download extensive results
-        results_csv = results.to_csv(index=False).encode('utf-8').copy()
-        st.download_button(label="Download results csv", data=results_csv,
-                           file_name=f"{ticker}_{strategy}_backtest.csv")
+        # Ensure results is not None before proceeding
+        if results:
+                with open(results, 'rb') as file:
+                        # Download button
+                        st.download_button(
+                            label="Download results Excel file",
+                            data=file,
+                            file_name=results,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+        else:
+            st.error("⚠️ Export Failed. Please check your inputs and try again.")
+
 
 
 

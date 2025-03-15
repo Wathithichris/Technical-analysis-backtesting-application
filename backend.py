@@ -167,23 +167,34 @@ class Returns(TechnicalIndicators):
         plt.legend()
         plt.show()
 
-    def export(self, statistics:pd.DataFrame):
-        with pd.ExcelWriter(f"{self.ticker}_backtest.xlsx",
-                            engine='xlsxwriter') as writer:
+    def export(self, statistics:pd.DataFrame, returns_data):
+        file_name = f"{self.ticker}_backtest.xlsx"
 
+        with pd.ExcelWriter(file_name, engine='xlsxwriter') as writer:
             workbook = writer.book
             sheet_name = f'{self.ticker.title()}_backtest'
+
+            # Write trade statistics Dataframe to Excel
             stats_df = statistics
             stats_df.to_excel(writer, sheet_name=sheet_name)
-            worksheet = writer.sheets[sheet_name]
-            df_plot = self.returns_data
-            (max_rows, max_columns) = df_plot.shape
-            trades_data = self.returns_data
+
+            # Ensure returns data is valid
+            if returns_data is None or returns_data.empty:
+                print("No trade data available!")
+                return None
+
+            # Write returns data
+            trades_data = returns_data
             trades_data.to_excel(writer, sheet_name=sheet_name, startrow=5, startcol=0)
+
+            # Adjust column width
+            worksheet = writer.sheets[sheet_name]
             for i, col in enumerate(trades_data.columns):
                 width = max(trades_data[col].apply(lambda x: len(str(x))).max(), len(col))
                 worksheet.set_column(i, i, width)
 
+            # Create a chart
+            (max_rows, max_columns) = trades_data.shape
             chart = workbook.add_chart({'type': 'line'})
             chart.add_series({
                 'values': f'={sheet_name}!$O$7:$O${max_rows}',
@@ -200,6 +211,8 @@ class Returns(TechnicalIndicators):
             chart.set_y_axis({'name': 'cumulative returns', 'major_gridlines':{'visible':True}})
             chart.set_legend({'position': 'top'})
             worksheet.insert_chart('U2', chart)
+
+            return file_name
 
 
 if __name__ =='__main__':
@@ -226,7 +239,7 @@ if __name__ =='__main__':
     print(data.data)
     print(data.calculate())
     print(stats)
-    print(data.export(stats))
+    print(data.export(stats, data.calculate()))
 
 
 
