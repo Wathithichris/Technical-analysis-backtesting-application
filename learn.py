@@ -19,7 +19,7 @@ ticker = st.text_input("Stock ticker", placeholder='aapl')
 ticker = ticker.strip().lower()
 
 
-# Get current days date
+# Get current days date to use as filter for maximum values in date inputs
 today = datetime.today()
 
 # Date inputs
@@ -59,7 +59,6 @@ if strategy == 'Donchian Channel':
         st.session_state.messages.append("Invalid Donchian period!")
 
 # Disable backtest button if warnings exist
-
 backtest = st.button(label="Run backtest", disabled=len(st.session_state.messages)>0)
 
 st.subheader("Backtest results")
@@ -106,7 +105,7 @@ if backtest:
         # Output stats dataframe
         st.dataframe(stats)
 
-        # Get extensive backtest
+        # Get extensive backtest results
         returns_data = data.calculate()
         results = data.export(stats, returns_data)
 
