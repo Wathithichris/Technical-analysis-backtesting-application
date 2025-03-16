@@ -1,17 +1,13 @@
-from datetime import datetime
 import yfinance  as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import requests_cache
-from fontTools.misc.cython import returns
 from requests import Session
 from requests_cache import CacheMixin, SQLiteCache
 from requests_ratelimiter import LimiterMixin, MemoryQueueBucket
 from pyrate_limiter import Duration, RequestRate, Limiter
 pd.set_option('display.width', None)
 from treasury_yield import get_rf
-import xlwings as xw
 class CachedLimiterSession(CacheMixin, LimiterMixin, Session):
     pass
 
@@ -176,13 +172,19 @@ class Returns(TechnicalIndicators):
               and selling your security when signal changes from 1 to 0.
         """
         moving_averages = ['SMA crossover', 'EMA crossover']
-        if self.strategy in moving_averages:
-            if self.strategy=='SMA crossover':
-                # Create a DataFrame using the sma technical indicator
-                df = self.sma(self.sma_short, self.sma_long)
-            elif self.strategy=='EMA crossover':
-                # Create a DataFrame using the ema technical indicator
-                df = self.ema(self.ema_short, self.ema_long)
+
+        if self.strategy=='SMA crossover':
+            # Create a DataFrame using the sma technical indicator
+            df = self.sma(self.sma_short, self.sma_long)
+            df['position'] = np.nan
+            # For moving average strategies buy when delta changes from 0 to 1 and exit when inverse happens
+            df['position'] = np.where((df['delta'] > 0) & (df['delta_prev'] < 0), 1,
+                                      np.where((df['delta'] < 0) & (df['delta_prev'] > 0), 0, df['position']))
+            df['position'] = df['position'].ffill().fillna(0)
+
+        elif self.strategy=='EMA crossover':
+            # Create a DataFrame using the ema technical indicator
+            df = self.ema(self.ema_short, self.ema_long)
 
             df['position'] = np.nan
             # For moving average strategies buy when delta changes from 0 to 1 and exit when inverse happens
@@ -191,7 +193,7 @@ class Returns(TechnicalIndicators):
             df['position'] = df['position'].ffill().fillna(0)
 
         elif self.strategy=='Donchian Channel':
-            df = self.donchian_channel(period=self.donchian_period)
+            df =  self.donchian_channel(period=self.donchian_period)
             df['position'] = np.nan
             # Enter long when closing price is greater than the previous upper band
             # Exit long when closing price is below the previous lower band
@@ -239,7 +241,7 @@ class Returns(TechnicalIndicators):
             dict: A python dictionary with the strategy's statistics.
 
         """
-        stats = {}
+        stats = dict()
         stats['total_returns%'] = (np.exp(log_returns.sum()) -  1) * 100
         stats['annual_returns%'] = (np.exp(log_returns.mean() * 252) - 1) * 100
         stats['annual_volatility%'] = log_returns.std() * np.sqrt(252) * 100
