@@ -1,6 +1,6 @@
+import numpy as np
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 from backend import Returns
 from treasury_yield import get_rf
 from datetime import datetime
@@ -11,8 +11,7 @@ st.set_page_config(layout='wide')
 
 # Create title widget and description of the app
 st.title("Stock Technical Analysis Backtester")
-st.write("""This app is to backtest popular technical analysis strategies in the 
-        stock market to get a feel of how they performed historically.""")
+st.write("""This is a technical analysis backtesting app.""")
 
 # Create ticker input widget to get stock ticker for pulling data
 ticker = st.text_input("Stock ticker", placeholder='aapl')
@@ -42,6 +41,7 @@ strategy = st.selectbox("Select strategy", ('SMA crossover', 'Donchian Channel',
 
 moving_averages = ['SMA crossover', 'EMA crossover']
 
+days = np.busday_count(start_date, end_date)
 # Strategy parameters
 if strategy in moving_averages:
     short_ma = st.number_input("short moving average", key='ma_s', step=1)
@@ -51,12 +51,22 @@ if strategy in moving_averages:
         st.warning("Please enter a valid short and long moving average period!")
         st.session_state.messages.append("Invalid moving averages!")
 
+    if long_ma > days:
+        st.warning("Extend the dates or reduce your long moving average!")
+        st.session_state.messages.append("Out of date period!")
+
 
 if strategy == 'Donchian Channel':
     period = st.number_input("Channel Period", key='period', step=1)
     if period <=0:
         st.warning("The channel period should be greater than 0!")
         st.session_state.messages.append("Invalid Donchian period!")
+
+    if period > days:
+        st.warning("Extend your end date or shorten the donchian period!")
+        st.session_state.messages.append("Out of date!")
+
+
 
 # Disable backtest button if warnings exist
 backtest = st.button(label="Run backtest", disabled=len(st.session_state.messages)>0)
@@ -100,7 +110,7 @@ if backtest:
         figure = data.visualize()
 
         # Visualize closing prices of the stock
-        st.plotly_chart(figure_or_data=figure, height=1500, width=600)
+        st.plotly_chart(figure_or_data=figure)
 
         # Output stats dataframe
         st.dataframe(stats)

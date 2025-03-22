@@ -67,7 +67,7 @@ class Data:
             matplotlib figure object: A line chart of the closing prices of the data against the date.
         """
         df_plot = self.data.copy()
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(10,8))
         ax.plot(df_plot['close'])
         ax.set_xlabel('Date')
         ax.set_ylabel('Price')

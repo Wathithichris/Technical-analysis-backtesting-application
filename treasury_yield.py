@@ -11,7 +11,6 @@ def get_rf(start_date, end_date):
 
     Returns:
         float: The average rate for the period specified rounded to five decimal places.
-
     """
     df_yields = pd.read_csv('US10Y_yields.csv', parse_dates=['observation_date'])
 
