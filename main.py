@@ -1,8 +1,6 @@
 import numpy as np
 import streamlit as st
 import pandas as pd
-from matplotlib.pyplot import margins
-
 from backend import Returns
 from treasury_yield import get_rf
 from datetime import datetime
