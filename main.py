@@ -5,7 +5,6 @@ from backend import Returns
 from treasury_yield import get_rf
 from datetime import datetime
 
-
 # set page layout to wide
 st.set_page_config(layout='wide')
 
