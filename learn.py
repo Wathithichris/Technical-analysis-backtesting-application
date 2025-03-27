@@ -10,8 +10,9 @@ from datetime import datetime
 st.set_page_config(layout='wide')
 
 # Create title widget and description of the app
-st.title("Stock Technical Analysis Backtester")
-st.write("""This is a technical analysis backtesting app.""")
+st.title("Technical Analysis Backtesting app")
+st.write("""This app helps backtest some of the popular technical analysis strategies, 
+    and compare the results with a buy and hold strategy.""")
 
 # Create ticker input widget to get stock ticker for pulling data
 ticker = st.text_input("Stock ticker", placeholder='aapl')
