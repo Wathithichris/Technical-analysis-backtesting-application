@@ -44,7 +44,7 @@ class Data:
         """
         # Catching rate-limiter to avoid corrupting the data
         session = CachedLimiterSession(
-            limiter=Limiter(RequestRate(10000, Duration.DAY*1)),
+            limiter=Limiter(RequestRate(8000, Duration.DAY*1)),
             bucket_class=MemoryQueueBucket,
             backend=SQLiteCache('yfinance.cache'))
         session.headers['User-agent'] = 'my_program/1.0'

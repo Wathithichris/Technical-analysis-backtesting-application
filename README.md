@@ -28,7 +28,7 @@ https://yfinance-python.org.
 The interval for the historical data is daily since daily closing price data is easily available,
 as compared to intraday data that may have data limits on how far back the data can go.
 
-*The api  has a limit request of 10,000 requests a day so be mindful of others while doing your analysis.*
+*The api  has a limit request of 8,000 requests a day so be mindful of others while doing your analysis.*
 
 ### Historical data
 The historical data for a particular security is obtained using a ticker symbol. 

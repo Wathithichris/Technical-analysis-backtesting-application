@@ -9,8 +9,10 @@ from datetime import datetime
 st.set_page_config(layout='wide')
 
 # Create title widget and description of the app
-st.title("Stock Technical Analysis Backtester")
-st.write("""This is a technical analysis backtesting app.""")
+st.title("Technical Analysis Backtesting application")
+st.subheader("""This application performs a backtest on financial instrument provided using a technical analysis\
+    strategy, and compares results of the strategy with results of a buy and hold strategy.""")
+st.write("Happy backtesting:smile:")
 
 # Create ticker input widget to get stock ticker for pulling data
 ticker = st.text_input("Stock ticker", placeholder='aapl')
@@ -64,8 +66,6 @@ if strategy == 'Donchian Channel':
     if period > days:
         st.warning("Extend your end date or shorten the donchian period!")
         st.session_state.messages.append("Out of date!")
-
-
 
 # Disable backtest button if warnings exist
 backtest = st.button(label="Run backtest", disabled=len(st.session_state.messages)>0)
